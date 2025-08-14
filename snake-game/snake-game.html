@@ -1,0 +1,1409 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Most Annoying Snake Game Ever</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        height: 100%;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        color: white;
+        font: 16px sans-serif;
+        overflow: hidden;
+        position: relative;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      }
+
+      /* Animated background */
+      body::before {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-image: 
+          radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
+          radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.15) 0%, transparent 50%);
+        animation: float 20s ease-in-out infinite;
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      @keyframes float {
+        0%, 100% { transform: translateY(0px) rotate(0deg); }
+        33% { transform: translateY(-20px) rotate(1deg); }
+        66% { transform: translateY(10px) rotate(-1deg); }
+      }
+
+      .score {
+        color: white;
+        font-size: 32px;
+        font-weight: 600;
+        padding: 20px;
+        text-align: center;
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 20px;
+        margin: 20px auto;
+        width: fit-content;
+        min-width: 120px;
+        box-shadow: 
+          0 8px 32px rgba(0, 0, 0, 0.1),
+          inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        animation: scoreGlow 3s ease-in-out infinite;
+        position: relative;
+        z-index: 10;
+      }
+
+      @keyframes scoreGlow {
+        0%, 100% { 
+          box-shadow: 
+            0 8px 32px rgba(0, 0, 0, 0.1),
+            inset 0 1px 0 rgba(255, 255, 255, 0.2),
+            0 0 20px rgba(255, 255, 255, 0.1);
+        }
+        50% { 
+          box-shadow: 
+            0 8px 32px rgba(0, 0, 0, 0.2),
+            inset 0 1px 0 rgba(255, 255, 255, 0.3),
+            0 0 30px rgba(255, 255, 255, 0.2);
+        }
+      }
+
+      .stage {
+        bottom: 0;
+        left: 0;
+        margin: auto;
+        position: absolute;
+        right: 0;
+        top: 0;
+        z-index: 5;
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(30px);
+        border: 2px solid rgba(255, 255, 255, 0.1);
+        border-radius: 25px;
+        box-shadow: 
+          0 25px 50px rgba(0, 0, 0, 0.2),
+          inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        transition: transform 0.5s ease;
+        overflow: hidden;
+      }
+
+      .stage.shake {
+        animation: stageShake 0.4s ease-in-out infinite;
+      }
+
+      @keyframes stageShake {
+        0%, 100% { 
+          transform: translate(0, 0) rotate(0deg);
+          box-shadow: 0 25px 50px rgba(0, 0, 0, 0.2);
+        }
+        25% { 
+          transform: translate(-4px, 4px) rotate(1deg);
+          box-shadow: 0 30px 60px rgba(255, 0, 0, 0.3);
+        }
+        75% { 
+          transform: translate(4px, -4px) rotate(-1deg);
+          box-shadow: 0 30px 60px rgba(255, 0, 0, 0.3);
+        }
+      }
+
+      .tile {
+        background: transparent;
+        position: absolute;
+        border-radius: 8px;
+        transition: all 0.2s ease;
+      }
+
+      .tile.pressed {
+        background: rgba(255, 255, 255, 0.2);
+        box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+        transform: scale(0.95);
+      }
+
+      .fake-retry {
+        position: absolute;
+        background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        border-radius: 15px;
+        z-index: 1001;
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        box-shadow: 
+          0 8px 25px rgba(255, 107, 107, 0.3),
+          inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      }
+
+      .fake-retry:hover {
+        transform: translate(60px, 60px) scale(1.1);
+        background: linear-gradient(135deg, #4ecdc4, #44a08d);
+        box-shadow: 
+          0 15px 35px rgba(78, 205, 196, 0.4),
+          inset 0 1px 0 rgba(255, 255, 255, 0.3);
+      }
+
+      .annoying-popup {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(20px);
+        border: 2px solid rgba(255, 193, 7, 0.5);
+        border-radius: 20px;
+        padding: 25px;
+        z-index: 1002;
+        animation: popupFloat 2s ease-in-out infinite;
+        font-weight: bold;
+        color: #333;
+        box-shadow: 
+          0 20px 40px rgba(0, 0, 0, 0.2),
+          inset 0 1px 0 rgba(255, 255, 255, 0.8);
+        max-width: 300px;
+        text-align: center;
+      }
+
+      .annoying-popup button {
+        margin-top: 15px;
+        padding: 8px 16px;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        border: none;
+        border-radius: 10px;
+        cursor: pointer;
+        font-weight: 600;
+        transition: all 0.3s ease;
+      }
+
+      .annoying-popup button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+      }
+
+      @keyframes popupFloat {
+        0%, 100% { 
+          transform: translate(-50%, -50%) scale(1) rotate(0deg);
+        }
+        50% { 
+          transform: translate(-50%, -50%) scale(1.05) rotate(1deg);
+        }
+      }
+
+      .disappearing-food {
+        animation: foodFlicker 1.5s ease-in-out infinite;
+      }
+
+      @keyframes foodFlicker {
+        0%, 40% { 
+          opacity: 1; 
+          transform: scale(1);
+        }
+        50%, 90% { 
+          opacity: 0.3; 
+          transform: scale(0.8);
+        }
+        100% { 
+          opacity: 1; 
+          transform: scale(1);
+        }
+      }
+
+      .moving-controls {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(20px);
+        padding: 15px;
+        border-radius: 15px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        animation: controlsMove 4s ease-in-out infinite;
+        z-index: 1000;
+        color: white;
+        font-size: 12px;
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+      }
+
+      @keyframes controlsMove {
+        0%, 100% { 
+          transform: translateX(0px) translateY(0px);
+        }
+        25% { 
+          transform: translateX(120px) translateY(-20px);
+        }
+        50% { 
+          transform: translateX(0px) translateY(-40px);
+        }
+        75% { 
+          transform: translateX(-120px) translateY(-20px);
+        }
+      }
+
+      .fake-game-over {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.9);
+        backdrop-filter: blur(10px);
+        color: white;
+        display: none;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+        z-index: 1003;
+        font-size: 28px;
+        text-align: center;
+      }
+
+      .fake-game-over h1 {
+        font-size: 48px;
+        margin-bottom: 20px;
+        background: linear-gradient(45deg, #ff6b6b, #ffd93d);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        animation: shimmer 2s ease-in-out infinite;
+      }
+
+      .fake-game-over button {
+        margin-top: 20px;
+        padding: 15px 30px;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        border: none;
+        border-radius: 15px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+      }
+
+      .fake-game-over button:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+      }
+
+      @keyframes shimmer {
+        0%, 100% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+      }
+
+      .rotating-stage {
+        animation: rotateStage 8s infinite ease-in-out;
+      }
+
+      @keyframes rotateStage {
+        0%, 100% { 
+          transform: rotate(0deg) scale(1);
+        }
+        25% { 
+          transform: rotate(90deg) scale(0.9);
+        }
+        50% { 
+          transform: rotate(180deg) scale(1);
+        }
+        75% { 
+          transform: rotate(270deg) scale(0.9);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="score">0</div>
+    <div class="stage"></div>
+    
+    <!-- Fake retry buttons that move when you try to click them -->
+    <button class="fake-retry" style="top: 100px; left: 100px;">Retry Game</button>
+    <button class="fake-retry" style="top: 200px; right: 100px;">New Game</button>
+    <button class="fake-retry" style="bottom: 100px; left: 200px;">Restart</button>
+
+    <!-- Moving controls display -->
+    <div class="moving-controls">
+      <div>Controls: WASD or Arrow Keys</div>
+      <div>(Good luck catching them!)</div>
+    </div>
+
+    <!-- Fake game over screen -->
+    <div class="fake-game-over" id="fakeGameOver">
+      <h1>GAME OVER!</h1>
+      <p>Just kidding! Keep playing!</p>
+      <button onclick="hideFakeGameOver()">Continue (Maybe)</button>
+    </div>
+
+    <script>
+      /*================================================
+      Polyfill
+      ================================================*/
+      (function(){ 'use strict';
+        var lastTime = 0;
+        var vendors = [ 'webkit', 'moz' ];
+        for( var x = 0; x < vendors.length && !window.requestAnimationFrame; ++x ) {
+          window.requestAnimationFrame = window[ vendors[ x ] + 'RequestAnimationFrame' ];
+          window.cancelAnimationFrame = window[ vendors[ x ] + 'CancelAnimationFrame' ] || window[ vendors[ x ] + 'CancelRequestAnimationFrame' ];
+        }
+
+        if( !window.requestAnimationFrame ) {
+          window.requestAnimationFrame = function( callback, element ) {
+            var currTime = new Date().getTime();
+            var timeToCall = Math.max( 0, 16 - ( currTime - lastTime ) );
+            var id = window.setTimeout(
+              function() { 
+                callback( currTime + timeToCall ); 
+              }, timeToCall );
+            lastTime = currTime + timeToCall;
+            return id;
+          }
+        }
+
+        if( !window.cancelAnimationFrame ) {
+          window.cancelAnimationFrame = function( id ) {
+            clearTimeout( id );
+          }
+        }
+      })();
+
+      /*================================================
+      Annoying Features
+      ================================================*/
+      let annoyanceLevel = 0;
+      let fakeGameOverShown = false;
+      let stageRotating = false;
+
+      function showFakeGameOver() {
+        if (!fakeGameOverShown) {
+          document.getElementById('fakeGameOver').style.display = 'flex';
+          fakeGameOverShown = true;
+          setTimeout(() => {
+            document.getElementById('fakeGameOver').style.display = 'none';
+            fakeGameOverShown = false;
+          }, 3000);
+        }
+      }
+
+      function hideFakeGameOver() {
+        document.getElementById('fakeGameOver').style.display = 'none';
+        fakeGameOverShown = false;
+      }
+
+      function addAnnoyingPopup() {
+        const messages = [
+          "Are you sure you want to play this game?",
+          "Warning: This game may cause frustration!",
+          "Have you tried turning it off and on again?",
+          "Error 404: Fun not found",
+          "Loading... Just kidding!",
+          "Your score is now negative!",
+          "The food has gained consciousness!"
+        ];
+        
+        const popup = document.createElement('div');
+        popup.className = 'annoying-popup';
+        popup.innerHTML = messages[Math.floor(Math.random() * messages.length)] + '<br><button onclick="this.parentElement.remove()">Close (if you can!)</button>';
+        document.body.appendChild(popup);
+        
+        setTimeout(() => {
+          if (popup.parentElement) {
+            popup.remove();
+          }
+        }, 4000);
+      }
+
+      function makeFakeRetryButtonsRun() {
+        const buttons = document.querySelectorAll('.fake-retry');
+        buttons.forEach(button => {
+          button.addEventListener('mouseover', () => {
+            const randomX = Math.random() * (window.innerWidth - 200);
+            const randomY = Math.random() * (window.innerHeight - 100);
+            button.style.left = randomX + 'px';
+            button.style.top = randomY + 'px';
+            button.innerHTML = "Nope!";
+            setTimeout(() => {
+              button.innerHTML = "Try Again!";
+            }, 1000);
+          });
+          
+          button.addEventListener('click', (e) => {
+            e.preventDefault();
+            alert("Haha! This button doesn't work!");
+            addAnnoyingPopup();
+          });
+        });
+      }
+
+      // Initialize annoying features
+      makeFakeRetryButtonsRun();
+      
+      // Random popups
+      setInterval(() => {
+        if (Math.random() < 0.1) {
+          addAnnoyingPopup();
+        }
+      }, 5000);
+
+      // Random fake game over
+      setInterval(() => {
+        if (Math.random() < 0.05) {
+          showFakeGameOver();
+        }
+      }, 8000);
+
+      /*================================================
+      DOM Manipulation
+      ================================================*/
+      (function(){ 'use strict';
+        function hasClass( elem, className ) {
+          return new RegExp( ' ' + className + ' ' ).test( ' ' + elem.className + ' ' );
+        };
+
+        function addClass( elem, className ) {
+          if( !hasClass(elem, className ) ) {
+            elem.className += ' ' + className;
+          }
+        };
+
+        function removeClass( elem, className ) {
+          var newClass = ' ' + elem.className.replace( /[\t\r\n]/g, ' ' ) + ' ';
+          if( hasClass( elem, className ) ) {
+            while( newClass.indexOf(' ' + className + ' ' ) >= 0 ) {
+              newClass = newClass.replace( ' ' + className + ' ', ' ' );
+            }
+            elem.className = newClass.replace( /^\s+|\s+$/g, '' );
+          }
+        };
+
+        function toggleClass( elem, className ) {
+          var newClass = ' ' + elem.className.replace( /[\t\r\n]/g, ' ' ) + ' ';
+          if( hasClass(elem, className ) ) {
+            while( newClass.indexOf( ' ' + className + ' ' ) >= 0 ) {
+              newClass = newClass.replace( ' ' + className + ' ' , ' ' );
+            }
+            elem.className = newClass.replace( /^\s+|\s+$/g, '' );
+          } else {
+            elem.className += ' ' + className;
+          }
+        };
+      })();
+
+      /*================================================
+      Core
+      ================================================*/
+      g = {};
+
+      (function(){ 'use strict';
+        g.m = Math;
+        g.mathProps = 'E LN10 LN2 LOG2E LOG10E PI SQRT1_2 SQRT2 abs acos asin atan ceil cos exp floor log round sin sqrt tan atan2 pow max min'.split( ' ' );
+        for ( var i = 0; i < g.mathProps.length; i++ ) {
+          g[ g.mathProps[ i ] ] = g.m[ g.mathProps[ i ] ];
+        }
+        g.m.TWO_PI = g.m.PI * 2;
+
+        g.isset = function( prop ) {
+          return typeof prop != 'undefined';
+        };
+
+        g.log = function() {
+          if( g.isset( g.config ) && g.config.debug && window.console ){
+            console.log( Array.prototype.slice.call( arguments ) );
+          }
+        };
+      })();
+
+      /*================================================
+      Group
+      ================================================*/
+      (function(){ 'use strict';
+        g.Group = function() {
+          this.collection = [];
+          this.length = 0;
+        };
+
+        g.Group.prototype.add = function( item ) {
+          this.collection.push( item );
+          this.length++;
+        };
+
+        g.Group.prototype.remove = function( index ) {
+          if( index < this.length ) {
+            this.collection.splice( index, 1 );
+            this.length--;
+          }
+        };
+
+        g.Group.prototype.empty = function() {
+          this.collection.length = 0;
+          this.length = 0;
+        };
+
+        g.Group.prototype.each = function( action, asc ) {
+          var asc = asc || 0,
+            i;
+          if( asc ) {
+            for( i = 0; i < this.length; i++ ) {
+              this.collection[ i ][ action ]( i );
+            }
+          } else {
+            i = this.length;
+            while( i-- ) {
+              this.collection[ i ][ action ]( i );
+            }
+          }
+        };
+      })();
+
+      /*================================================
+      Utilities
+      ================================================*/
+      (function(){ 'use strict';
+        g.util = {};
+        
+        g.util.rand = function( min, max ) {
+          return g.m.random() * ( max - min ) + min;
+        };
+
+        g.util.randInt = function( min, max ) {
+          return g.m.floor( g.m.random() * ( max - min + 1) ) + min;
+        };
+      }());
+
+      /*================================================
+      State
+      ================================================*/
+      (function(){ 'use strict';
+        g.states = {};
+
+        g.addState = function( state ) {
+          g.states[ state.name ] = state;
+        };
+
+        g.setState = function( name ) {
+          if( g.state ) {
+            g.states[ g.state ].exit();
+          }
+          g.state = name;
+          g.states[ g.state ].init();
+        };
+
+        g.currentState = function() {
+          return g.states[ g.state ];
+        };
+      }());
+
+      /*================================================
+      Time
+      ================================================*/
+      (function(){ 'use strict';
+        g.Time = function() {
+          this.reset();
+        }
+
+        g.Time.prototype.reset = function() {
+          this.now = Date.now();
+          this.last = Date.now();
+          this.delta = 60;
+          this.ndelta = 1;
+          this.elapsed = 0;
+          this.nelapsed = 0;
+          this.tick = 0;
+        };
+
+        g.Time.prototype.update = function() {
+          this.now = Date.now();
+          this.delta = this.now - this.last;
+          this.ndelta = Math.min( Math.max( this.delta / ( 1000 / 60 ), 0.0001 ), 10 );
+          this.elapsed += this.delta;
+          this.nelapsed += this.ndelta;
+          this.last = this.now;
+          this.tick++;
+        };
+      })();
+
+      /*================================================
+      Grid Entity
+      ================================================*/
+      (function(){ 'use strict';
+        g.Grid = function( cols, rows ) {
+          this.cols = cols;
+          this.rows = rows;
+          this.tiles = [];
+          for( var x = 0; x < cols; x++ ) {
+            this.tiles[ x ] = [];
+            for( var y = 0; y < rows; y++ ) {
+              this.tiles[ x ].push( 'empty' );
+            }
+          }
+        };
+
+        g.Grid.prototype.get = function( x, y ) {
+          return this.tiles[ x ][ y ];
+        };
+
+        g.Grid.prototype.set = function( x, y, val ) {
+          this.tiles[ x ][ y ] = val;
+        };
+      })();
+
+      /*================================================
+      Board Tile Entity
+      ================================================*/
+      (function(){ 'use strict';
+        g.BoardTile = function( opt ) {
+          this.parentState = opt.parentState;
+          this.parentGroup = opt.parentGroup;
+          this.col = opt.col;
+          this.row = opt.row;
+          this.x = opt.x;
+          this.y = opt.y;
+          this.z = 0;
+          this.w = opt.w;
+          this.h = opt.h;
+          this.elem = document.createElement( 'div' );
+          this.elem.style.position = 'absolute';
+          this.elem.className = 'tile';
+          this.parentState.stageElem.appendChild( this.elem );
+          this.classes = {
+            pressed: 0,
+            path: 0,
+            up: 0,
+            down: 0,
+            left: 0,
+            right: 0
+          }
+          this.updateDimensions();
+        };
+
+        g.BoardTile.prototype.update = function() {
+          for( var k in this.classes ) {
+            if( this.classes[ k ] ) {
+              this.classes[ k ]--;
+            }
+          }
+
+          if( this.parentState.food.tile.col == this.col || this.parentState.food.tile.row == this.row ) {
+            this.classes.path = 1;
+            if( this.col < this.parentState.food.tile.col ) {
+              this.classes.right = 1;
+            } else {
+              this.classes.right = 0;
+            }
+            if( this.col > this.parentState.food.tile.col ) {
+              this.classes.left = 1;
+            } else {
+              this.classes.left = 0;
+            }
+            if( this.row > this.parentState.food.tile.row ) {
+              this.classes.up = 1;
+            } else {
+              this.classes.up = 0;
+            }
+            if( this.row < this.parentState.food.tile.row ) {
+              this.classes.down = 1;
+            } else {
+              this.classes.down = 0;
+            }
+          } else {
+            this.classes.path = 0;
+          }
+
+          if( this.parentState.food.eaten ) {
+            this.classes.path = 0;
+          }
+        };
+
+        g.BoardTile.prototype.updateDimensions = function() {
+          this.x = this.col * this.parentState.tileWidth;
+          this.y = this.row * this.parentState.tileHeight;
+          this.w = this.parentState.tileWidth - this.parentState.spacing;
+          this.h = this.parentState.tileHeight - this.parentState.spacing;
+          this.elem.style.left = this.x + 'px';
+          this.elem.style.top = this.y + 'px';
+          this.elem.style.width = this.w + 'px';
+          this.elem.style.height = this.h + 'px';
+        };
+
+        g.BoardTile.prototype.render = function() {
+          var classString = '';
+          for( var k in this.classes ) {
+            if( this.classes[ k ] ) {
+              classString += k + ' ';
+            }
+          }
+          this.elem.className = 'tile ' + classString;
+        };
+      })();
+
+      /*================================================
+      Snake Tile Entity
+      ================================================*/
+      (function(){ 'use strict';
+        g.SnakeTile = function( opt ) {
+          this.parentState = opt.parentState;
+          this.parentGroup = opt.parentGroup;
+          this.col = opt.col;
+          this.row = opt.row;
+          this.x = opt.x;
+          this.y = opt.y;
+          this.w = opt.w;
+          this.h = opt.h;
+          this.color = null;
+          this.scale = 1;
+          this.rotation = 0;
+          this.blur = 0;
+          this.alpha = 1;
+          this.borderRadius = 0;
+          this.borderRadiusAmount = 0;
+          this.elem = document.createElement( 'div' );
+          this.elem.style.position = 'absolute';
+          this.parentState.stageElem.appendChild( this.elem );
+        };
+
+        g.SnakeTile.prototype.update = function( i ) {
+          this.x = this.col * this.parentState.tileWidth;
+          this.y = this.row * this.parentState.tileHeight;
+          // Enhanced snake colors with glassmorphism
+          const colors = [
+            'rgba(102, 126, 234, 0.8)',
+            'rgba(255, 107, 107, 0.8)', 
+            'rgba(78, 205, 196, 0.8)',
+            'rgba(255, 193, 7, 0.8)',
+            'rgba(156, 39, 176, 0.8)',
+            'rgba(255, 152, 0, 0.8)'
+          ];
+          this.color = colors[Math.floor(Math.random() * colors.length)];
+        };
+
+        g.SnakeTile.prototype.updateDimensions = function() {
+          this.w = this.parentState.tileWidth - this.parentState.spacing;
+          this.h = this.parentState.tileHeight - this.parentState.spacing;
+        };
+
+        g.SnakeTile.prototype.render = function( i ) {
+          this.elem.style.left = this.x + 'px';
+          this.elem.style.top = this.y + 'px';
+          this.elem.style.width = this.w + 'px';
+          this.elem.style.height = this.h + 'px';
+          this.elem.style.backgroundColor = this.color;
+          this.elem.style.borderRadius = '8px';
+          this.elem.style.backdropFilter = 'blur(10px)';
+          this.elem.style.border = '1px solid rgba(255, 255, 255, 0.2)';
+          this.elem.style.boxShadow = '0 4px 15px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2)';
+          this.elem.style.transition = 'all 0.2s ease';
+        };
+      })();
+
+      /*================================================
+      Food Tile Entity (Now with disappearing action!)
+      ================================================*/
+      (function(){ 'use strict';
+        g.FoodTile = function( opt ) {
+          this.parentState = opt.parentState;
+          this.parentGroup = opt.parentGroup;
+          this.col = opt.col;
+          this.row = opt.row;
+          this.x = opt.x;
+          this.y = opt.y;
+          this.w = opt.w;
+          this.h = opt.h;
+          this.blur = 0;
+          this.scale = 1;
+          this.hue = 100;
+          this.opacity = 0;
+          this.disappearTimer = 0;
+          this.maxDisappearTime = 180; // Disappears every 3 seconds
+          this.elem = document.createElement( 'div' );
+          this.elem.style.position = 'absolute';
+          this.parentState.stageElem.appendChild( this.elem );
+        };
+
+        g.FoodTile.prototype.update = function() {
+          this.x = this.col * this.parentState.tileWidth;
+          this.y = this.row * this.parentState.tileHeight;
+          
+          // Annoying disappearing food
+          this.disappearTimer++;
+          if (this.disappearTimer > this.maxDisappearTime) {
+            this.elem.className = 'disappearing-food';
+            // Move to a new random location every few seconds
+            if (this.disappearTimer > this.maxDisappearTime + 60) {
+              this.parentState.food.reset();
+              this.disappearTimer = 0;
+              this.elem.className = '';
+            }
+          }
+        };
+
+        g.FoodTile.prototype.updateDimensions = function() {
+          this.w = this.parentState.tileWidth - this.parentState.spacing;
+          this.h = this.parentState.tileHeight - this.parentState.spacing;
+        };
+
+        g.FoodTile.prototype.render = function() {
+          this.elem.style.left = this.x + 'px';
+          this.elem.style.top = this.y + 'px';
+          this.elem.style.width = this.w + 'px';
+          this.elem.style.height = this.h + 'px';
+          this.elem.style.background = 'linear-gradient(135deg, #ffd93d, #ff6b6b)';
+          this.elem.style.borderRadius = '50%';
+          this.elem.style.backdropFilter = 'blur(10px)';
+          this.elem.style.border = '2px solid rgba(255, 255, 255, 0.3)';
+          this.elem.style.boxShadow = '0 8px 20px rgba(255, 107, 107, 0.3), inset 0 2px 0 rgba(255, 255, 255, 0.3)';
+          this.elem.style.animation = 'foodPulse 2s ease-in-out infinite';
+        };
+
+        // Add CSS for food pulse animation
+        const style = document.createElement('style');
+        style.textContent = `
+          @keyframes foodPulse {
+            0%, 100% { 
+              transform: scale(1);
+              box-shadow: 0 8px 20px rgba(255, 107, 107, 0.3), inset 0 2px 0 rgba(255, 255, 255, 0.3);
+            }
+            50% { 
+              transform: scale(1.1);
+              box-shadow: 0 12px 30px rgba(255, 107, 107, 0.5), inset 0 2px 0 rgba(255, 255, 255, 0.4);
+            }
+          }
+        `;
+        document.head.appendChild(style);
+      })();
+
+      /*================================================
+      Snake Entity (Now with more annoyance!)
+      ================================================*/
+      (function(){ 'use strict';
+        g.Snake = function( opt ) {
+          this.parentState = opt.parentState;
+          this.dir = 'e',
+          this.currDir = this.dir;
+          this.tiles = [];
+          for( var i = 0; i < 5; i++ ) {
+            this.tiles.push( new g.SnakeTile({
+              parentState: this.parentState,
+              parentGroup: this.tiles,
+              col: 8 - i,
+              row: 3,
+              x: ( 8 - i ) * opt.parentState.tileWidth,
+              y: 3 * opt.parentState.tileHeight,
+              w: opt.parentState.tileWidth - opt.parentState.spacing,
+              h: opt.parentState.tileHeight - opt.parentState.spacing
+            }));
+          }
+          this.last = 0;
+          this.updateTick = 10;
+          this.updateTickMax = this.updateTick;
+          this.updateTickLimit = 3;
+          this.updateTickChange = 0.2;
+          this.deathFlag = 0;
+          this.justAteTick = 0;
+          this.justAteTickMax = 1;
+          this.justAteTickChange = 0.05;
+          this.controlsReversed = false;
+          this.reverseTimer = 0;
+
+          var i = this.tiles.length;
+          while( i-- ) {
+            this.parentState.grid.set( this.tiles[ i ].col, this.tiles[ i ].row, 'snake' );
+          }
+        };
+
+        g.Snake.prototype.updateDimensions = function() {
+          var i = this.tiles.length;
+          while( i-- ) {
+            this.tiles[ i ].updateDimensions();
+          }
+        };
+
+        g.Snake.prototype.update = function() {
+          // Annoying feature: Randomly reverse controls
+          this.reverseTimer++;
+          if (this.reverseTimer > 300 && Math.random() < 0.02) {
+            this.controlsReversed = !this.controlsReversed;
+            this.reverseTimer = 0;
+            addAnnoyingPopup();
+          }
+
+          // Process input with potential reversal
+          let actualUp = this.controlsReversed ? this.parentState.keys.down : this.parentState.keys.up;
+          let actualDown = this.controlsReversed ? this.parentState.keys.up : this.parentState.keys.down;
+          let actualLeft = this.controlsReversed ? this.parentState.keys.right : this.parentState.keys.left;
+          let actualRight = this.controlsReversed ? this.parentState.keys.left : this.parentState.keys.right;
+
+          if( actualUp ) {
+            if( this.dir != 's' && this.dir != 'n' && this.currDir != 's' && this.currDir != 'n' ) {
+              this.dir = 'n';
+            }
+          } else if( actualDown ) {
+            if( this.dir != 'n' && this.dir != 's' && this.currDir != 'n' && this.currDir != 's' ) {
+              this.dir = 's';
+            }
+          } else if( actualRight ) {
+            if( this.dir != 'w' && this.dir != 'e' && this.currDir != 'w' && this.currDir != 'e' ) {
+              this.dir = 'e';
+            }
+          } else if( actualLeft ) {
+            if( this.dir != 'e' && this.dir != 'w' && this.currDir != 'e' && this.currDir != 'w' ) {
+              this.dir = 'w';
+            }
+          }
+
+          this.parentState.keys.up = 0;
+          this.parentState.keys.down = 0;
+          this.parentState.keys.right = 0;
+          this.parentState.keys.left = 0;
+
+          this.updateTick += this.parentState.time.ndelta;
+          if( this.updateTick >= this.updateTickMax ) {
+            this.updateTick = ( this.updateTick - this.updateTickMax );
+
+            this.tiles.unshift( new g.SnakeTile({
+              parentState: this.parentState,
+              parentGroup: this.tiles,
+              col: this.tiles[ 0 ].col,
+              row: this.tiles[ 0 ].row,
+              x: this.tiles[ 0 ].col * this.parentState.tileWidth,
+              y: this.tiles[ 0 ].row * this.parentState.tileHeight,
+              w: this.parentState.tileWidth - this.parentState.spacing,
+              h: this.parentState.tileHeight - this.parentState.spacing
+            }));
+            this.last = this.tiles.pop();
+            this.parentState.stageElem.removeChild( this.last.elem );
+
+            this.parentState.boardTiles.collection[ this.last.col + ( this.last.row * this.parentState.cols ) ].classes.pressed = 2;
+
+            var i = this.tiles.length;
+            while( i-- ) {
+              this.parentState.grid.set( this.tiles[ i ].col, this.tiles[ i ].row, 'snake' );
+            }
+            this.parentState.grid.set( this.last.col, this.last.row, 'empty' );
+
+            if ( this.dir == 'n' ) {
+              this.currDir = 'n';
+              this.tiles[ 0 ].row -= 1;
+            } else if( this.dir == 's' ) {
+              this.currDir = 's';
+              this.tiles[ 0 ].row += 1;
+            } else if( this.dir == 'w' ) {
+              this.currDir = 'w';
+              this.tiles[ 0 ].col -= 1;
+            } else if( this.dir == 'e' ) {
+              this.currDir = 'e';
+              this.tiles[ 0 ].col += 1;
+            }
+
+            this.wallFlag = false;
+            if( this.tiles[ 0 ].col >= this.parentState.cols ) {
+              this.tiles[ 0 ].col = 0;
+              this.wallFlag = true;
+            }
+            if( this.tiles[ 0 ].col < 0 ) {
+              this.tiles[ 0 ].col = this.parentState.cols - 1;
+              this.wallFlag = true;
+            }
+            if( this.tiles[ 0 ].row >= this.parentState.rows ) {
+              this.tiles[ 0 ].row = 0;
+              this.wallFlag = true;
+            }
+            if( this.tiles[ 0 ].row < 0 ) {
+              this.tiles[ 0 ].row = this.parentState.rows - 1;
+              this.wallFlag = true;
+            }
+
+            if( this.parentState.grid.get( this.tiles[ 0 ].col, this.tiles[ 0 ].row ) == 'snake' ) {
+              // Instead of ending game, just show fake game over and continue
+              showFakeGameOver();
+              // Make the stage shake
+              this.parentState.stageElem.classList.add('shake');
+              setTimeout(() => {
+                this.parentState.stageElem.classList.remove('shake');
+              }, 1000);
+              // Reset snake but don't actually end the game
+              this.tiles = this.tiles.slice(0, 3); // Make snake smaller as punishment
+            }
+
+            // Check eating of food
+            if( this.parentState.grid.get( this.tiles[ 0 ].col, this.tiles[ 0 ].row ) == 'food' ) {
+              // Annoying: Sometimes the food doesn't count
+              if (Math.random() < 0.3) {
+                // Fake eating - no growth, just relocate food
+                addAnnoyingPopup();
+                this.parentState.food.eaten = 1;
+                this.parentState.stageElem.removeChild( this.parentState.food.tile.elem );
+                
+                var _this = this;
+                this.foodCreateTimeout = setTimeout( function() {
+                  _this.parentState.food = new g.Food({
+                    parentState: _this.parentState
+                  });
+                }, 300);
+              } else {
+                // Real eating
+                this.tiles.push( new g.SnakeTile({
+                  parentState: this.parentState,
+                  parentGroup: this.tiles,
+                  col: this.last.col,
+                  row: this.last.row,
+                  x: this.last.col * this.parentState.tileWidth,
+                  y: this.last.row * this.parentState.tileHeight,
+                  w: this.parentState.tileWidth - this.parentState.spacing,
+                  h: this.parentState.tileHeight - this.parentState.spacing
+                }));
+                
+                if( this.updateTickMax - this.updateTickChange > this.updateTickLimit ) {
+                  this.updateTickMax -= this.updateTickChange;
+                }
+                
+                // Annoying score system
+                let scoreIncrease = Math.random() < 0.5 ? -1 : Math.floor(Math.random() * 5) + 1;
+                this.parentState.score += scoreIncrease;
+                this.parentState.scoreElem.innerHTML = this.parentState.score;
+                this.justAteTick = this.justAteTickMax;
+
+                this.parentState.food.eaten = 1;
+                this.parentState.stageElem.removeChild( this.parentState.food.tile.elem );
+
+                var _this = this;
+                
+                this.foodCreateTimeout = setTimeout( function() {
+                  _this.parentState.food = new g.Food({
+                    parentState: _this.parentState
+                  });
+                }, 300);
+
+                // Randomly rotate the stage when eating
+                if (Math.random() < 0.2) {
+                  _this.parentState.stageElem.classList.add('rotating-stage');
+                  setTimeout(() => {
+                    _this.parentState.stageElem.classList.remove('rotating-stage');
+                  }, 5000);
+                }
+              }
+            }
+          }
+
+          var i = this.tiles.length;
+          while( i-- ) {
+            this.tiles[ i ].update( i );
+          }
+
+          if( this.justAteTick > 0 ) {
+            this.justAteTick -= this.justAteTickChange;
+          } else if( this.justAteTick < 0 ) {
+            this.justAteTick = 0;
+          }
+        };
+
+        g.Snake.prototype.render = function() {
+          var i = this.tiles.length;
+          while( i-- ) {
+            this.tiles[ i ].render( i );
+          }
+        };
+      })();
+
+      /*================================================
+      Food Entity
+      ================================================*/
+      (function(){ 'use strict';
+        g.Food = function( opt ) {
+          this.parentState = opt.parentState;
+          this.tile = new g.FoodTile({
+            parentState: this.parentState,
+            col: 0,
+            row: 0,
+            x: 0,
+            y: 0,
+            w: opt.parentState.tileWidth - opt.parentState.spacing,
+            h: opt.parentState.tileHeight - opt.parentState.spacing
+          });
+          this.reset();
+          this.eaten = 0;
+          this.birthTick = 1;
+          this.deathTick = 0;
+          this.birthTickChange = 0.025;
+          this.deathTickChange = 0.05;
+        };
+
+        g.Food.prototype.reset = function() {
+          var empty = [];
+          for( var x = 0; x < this.parentState.cols; x++) {
+            for( var y = 0; y < this.parentState.rows; y++) {
+              var tile = this.parentState.grid.get( x, y );
+              if( tile == 'empty' ) {
+                empty.push( { x: x, y: y } );
+              }
+            }
+          }
+          var newTile = empty[ g.util.randInt( 0, empty.length - 1 ) ];
+          this.tile.col = newTile.x;
+          this.tile.row = newTile.y;
+          this.tile.disappearTimer = 0;
+          this.tile.elem.className = '';
+        };
+
+        g.Food.prototype.updateDimensions = function() {
+          this.tile.updateDimensions();
+        };
+
+        g.Food.prototype.update = function() {
+          this.tile.update();
+
+          if( this.birthTick > 0 ) {
+            this.birthTick -= this.birthTickChange;
+          } else if( this.birthTick < 0 ) {
+            this.birthTick = 0;
+          }
+
+          this.parentState.grid.set( this.tile.col, this.tile.row, 'food' );
+        };
+
+        g.Food.prototype.render = function() {
+          this.tile.render();
+        };
+      })();
+
+      /*================================================
+      Play State
+      ================================================*/
+      (function(){ 'use strict';
+        function StatePlay() {
+          this.name = 'play';
+        }
+
+        StatePlay.prototype.init = function() {
+          this.scoreElem = document.querySelector( '.score' );
+          this.stageElem = document.querySelector( '.stage' );
+          this.dimLong = 28;
+          this.dimShort = 16;
+          this.padding = 0.25;
+          this.boardTiles = new g.Group();
+          this.keys = {};
+          this.foodCreateTimeout = null;
+          this.score = 0;
+          this.scoreElem.innerHTML = this.score;
+          this.time = new g.Time();
+          this.getDimensions();
+          if( this.winWidth < this.winHeight ) {
+            this.rows = this.dimLong;
+            this.cols = this.dimShort;
+          } else {
+            this.rows = this.dimShort;
+            this.cols = this.dimLong;
+          }
+          this.spacing = 1;
+          this.grid = new g.Grid( this.cols, this.rows );
+          this.resize();
+          this.createBoardTiles();
+          this.bindEvents();
+          this.snake = new g.Snake({
+            parentState: this
+          });
+          this.food = new g.Food({
+            parentState: this
+          });
+
+          // Add more annoyance
+          this.annoyanceTimer = 0;
+        };
+
+        StatePlay.prototype.getDimensions = function() {
+          this.winWidth = window.innerWidth;
+          this.winHeight = window.innerHeight;
+          this.activeWidth = this.winWidth - ( this.winWidth * this.padding );
+          this.activeHeight = this.winHeight - ( this.winHeight * this.padding );
+        };
+
+        StatePlay.prototype.resize = function() {
+          var _this = g.currentState();
+
+          _this.getDimensions();
+
+          _this.stageRatio = _this.rows / _this.cols;
+
+          if( _this.activeWidth > _this.activeHeight / _this.stageRatio ) {
+            _this.stageHeight = _this.activeHeight;
+            _this.stageElem.style.height = _this.stageHeight + 'px';
+            _this.stageWidth = Math.floor( _this.stageHeight /_this.stageRatio );
+            _this.stageElem.style.width = _this.stageWidth + 'px';
+          } else {
+            _this.stageWidth = _this.activeWidth;
+            _this.stageElem.style.width = _this.stageWidth + 'px';
+            _this.stageHeight = Math.floor( _this.stageWidth * _this.stageRatio );
+            _this.stageElem.style.height = _this.stageHeight + 'px';
+          }
+
+          _this.tileWidth = ~~( _this.stageWidth / _this.cols );
+          _this.tileHeight = ~~( _this.stageHeight / _this.rows );
+          _this.dimAvg = ( _this.activeWidth + _this.activeHeight ) / 2;
+          _this.spacing = Math.max( 1, ~~( _this.dimAvg * 0.0025 ) );
+
+          _this.stageElem.style.marginTop = ( -_this.stageElem.offsetHeight / 2 ) + _this.headerHeight / 2 + 'px';
+
+          _this.boardTiles.each( 'updateDimensions' );
+          _this.snake !== undefined && _this.snake.updateDimensions();
+          _this.food !== undefined && _this.food.updateDimensions();
+        };
+
+        StatePlay.prototype.createBoardTiles = function() {
+          for( var y = 0; y < this.rows; y++ ) {
+            for( var x = 0; x < this.cols; x++ ) {
+              this.boardTiles.add( new g.BoardTile({
+                parentState: this,
+                parentGroup: this.boardTiles,
+                col: x,
+                row: y,
+                x: x * this.tileWidth,
+                y: y * this.tileHeight,
+                w: this.tileWidth - this.spacing,
+                h: this.tileHeight - this.spacing
+              }));
+            }
+          }
+        };
+
+        StatePlay.prototype.upOn = function() { g.currentState().keys.up = 1; }
+        StatePlay.prototype.downOn = function() { g.currentState().keys.down = 1; }
+        StatePlay.prototype.rightOn = function() { g.currentState().keys.right = 1; }
+        StatePlay.prototype.leftOn = function() { g.currentState().keys.left = 1; }
+        StatePlay.prototype.upOff = function() { g.currentState().keys.up = 0; }
+        StatePlay.prototype.downOff = function() { g.currentState().keys.down = 0; }
+        StatePlay.prototype.rightOff = function() { g.currentState().keys.right = 0; }
+        StatePlay.prototype.leftOff = function() { g.currentState().keys.left = 0; }
+
+        StatePlay.prototype.keydown = function( e ) {
+          e.preventDefault();
+          var e = ( e.keyCode ? e.keyCode : e.which ),
+            _this = g.currentState();
+          
+          // Annoying: Sometimes keys don't work
+          if (Math.random() < 0.1) {
+            return;
+          }
+          
+          if( e === 38 || e === 87 ) { _this.upOn(); }
+          if( e === 39 || e === 68 ) { _this.rightOn(); }
+          if( e === 40 || e === 83 ) { _this.downOn(); }
+          if( e === 37 || e === 65 ) { _this.leftOn(); }
+        };
+
+        StatePlay.prototype.bindEvents = function() {
+          var _this = g.currentState();
+          window.addEventListener( 'keydown', _this.keydown, false );
+          window.addEventListener( 'resize', _this.resize, false );
+        };
+
+        StatePlay.prototype.step = function() {
+          this.annoyanceTimer++;
+          
+          // Random stage movements
+          if (this.annoyanceTimer % 600 === 0 && Math.random() < 0.3) {
+            this.stageElem.style.transform = 'translate(' + (Math.random() * 20 - 10) + 'px, ' + (Math.random() * 20 - 10) + 'px)';
+            setTimeout(() => {
+              this.stageElem.style.transform = '';
+            }, 1000);
+          }
+
+          this.boardTiles.each( 'update' );
+          this.boardTiles.each( 'render' );
+          this.snake.update();
+          this.snake.render();
+          this.food.update();
+          this.food.render();
+          this.time.update();
+        };
+
+        StatePlay.prototype.exit = function() {
+          window.removeEventListener( 'keydown', this.keydown, false );
+          window.removeEventListener( 'resize', this.resize, false );
+          this.stageElem.innerHTML = '';
+          this.grid.tiles = null;
+          this.time = null;
+        };
+
+        g.addState( new StatePlay() );
+      })();
+
+      /*================================================
+      Game
+      ================================================*/
+      (function(){ 'use strict';
+        g.config = {
+          title: 'The Most Annoying Snake Game Ever',
+          debug: window.location.hash == '#debug' ? 1 : 0,
+          state: 'play'
+        };
+
+        g.setState( g.config.state );
+
+        g.time = new g.Time();
+
+        g.step = function() {
+          requestAnimationFrame( g.step );
+          g.states[ g.state ].step();
+          g.time.update();
+        };
+
+        window.addEventListener( 'load', g.step, false );
+      })();
+
+      // Add final touch of annoyance - random alerts
+      setInterval(() => {
+        if (Math.random() < 0.02) {
+          const messages = [
+            "Your snake is getting tired!",
+            "Food is now expired!",
+            "Go study for Exams",
+            "Snake.exe has stopped working",
+            "Are ya winning, son?",
+            "Press Alt+F4 for cheat codes!",
+            "Your score has been reset to 0... just kidding!",
+            "Warning: Snake may contain nuts",
+            "Achievement Unlocked: Wasted Time"
+          ];
+          setTimeout(() => {
+            alert(messages[Math.floor(Math.random() * messages.length)]);
+          }, Math.random() * 1000);
+        }
+      }, 10000);
+
+      // Only buttons redirect to the gif
+      const rickRollUrl = 'https://c.tenor.com/x8v1oNUOmg4AAAAd/tenor.gif';
+
+      // Make fake retry buttons redirect
+      document.addEventListener('DOMContentLoaded', function() {
+        const fakeButtons = document.querySelectorAll('.fake-retry');
+        fakeButtons.forEach(button => {
+          button.addEventListener('click', function() {
+            if (Math.random() < 0.28) { // 28% chance the fake button actually redirects
+              alert('Redirecting to game servers...');
+              setTimeout(() => {
+                window.location.href = rickRollUrl;
+              }, 1000);
+            }
+          });
+        });
+      });
+    </script>
+  </body>
+</html>
